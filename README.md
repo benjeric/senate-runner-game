@@ -1,0 +1,387 @@
+# Senate Escape Runner (Parody Game)
+
+This is a fictional parody-style running game inspired by action runner games.
+
+Save this as:
+
+```txt
+index.html
+```
+
+Then run it using VS Code + Live Server.
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Senate Escape Runner</title>
+
+    <style>
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+        }
+
+        body{
+            overflow:hidden;
+            background:#111;
+            font-family:Arial, sans-serif;
+        }
+
+        canvas{
+            display:block;
+            margin:auto;
+            background:linear-gradient(to bottom, #2b2b2b, #4d4d4d);
+            border:4px solid white;
+        }
+
+        #scoreBoard{
+            position:absolute;
+            top:10px;
+            left:10px;
+            color:white;
+            font-size:28px;
+            z-index:10;
+        }
+
+        #gameOver{
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%, -50%);
+            color:white;
+            text-align:center;
+            display:none;
+        }
+
+        #gameOver h1{
+            font-size:50px;
+            margin-bottom:20px;
+        }
+
+        #gameOver img{
+            width:300px;
+            border:5px solid white;
+            border-radius:10px;
+        }
+
+        #gameOver button{
+            margin-top:20px;
+            padding:12px 25px;
+            font-size:20px;
+            cursor:pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="scoreBoard">
+    Score: <span id="score">0</span>
+</div>
+
+<div id="gameOver">
+    <h1>CAUGHT!</h1>
+
+    <!-- Replace this image with your own custom image -->
+    <img src="https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Ftse2.mm.bing.net%2Fth%2Fid%2FOIP.uYu0qJrys48yjbUbPqvuXAHaEP%3Fpid%3DApi&sp=1779510378Tac72bf1778da4de08b34526ebafb48cc93568a81d1673e3abf99f6d00dbbef76" alt="Captured">
+
+    <br>
+
+    <button onclick="restartGame()">Play Again</button>
+</div>
+
+<canvas id="gameCanvas" width="1100" height="550"></canvas>
+
+<script>
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const scoreText = document.getElementById("score");
+const gameOverScreen = document.getElementById("gameOver");
+
+let gameRunning = true;
+let score = 0;
+
+const player = {
+    x:120,
+    y:390,
+    width:50,
+    height:80,
+    velocityY:0,
+    gravity:1,
+    jumpPower:-18,
+    grounded:true
+};
+
+let obstacles = [];
+let agents = [];
+
+function drawPlayer(){
+
+    // Body
+    ctx.fillStyle = "black";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+
+    // Head
+    ctx.fillStyle = "#f1c27d";
+    ctx.beginPath();
+    ctx.arc(player.x + 25, player.y - 18, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shades
+    ctx.fillStyle = "black";
+    ctx.fillRect(player.x + 10, player.y - 22, 30, 8);
+
+    // Label
+    ctx.fillStyle = "yellow";
+    ctx.font = "18px Arial";
+    ctx.fillText("B", player.x + 18, player.y + 45);
+}
+
+function updatePlayer(){
+
+    player.velocityY += player.gravity;
+    player.y += player.velocityY;
+
+    if(player.y >= 390){
+        player.y = 390;
+        player.velocityY = 0;
+        player.grounded = true;
+    }
+}
+
+function jump(){
+
+    if(player.grounded){
+        player.velocityY = player.jumpPower;
+        player.grounded = false;
+    }
+}
+
+function createObstacle(){
+
+    const obstacle = {
+        x: canvas.width,
+        y: 430,
+        width: 50,
+        height: 40
+    };
+
+    obstacles.push(obstacle);
+}
+
+function drawObstacles(){
+
+    ctx.fillStyle = "gray";
+
+    obstacles.forEach(obstacle => {
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
+        ctx.fillStyle = "white";
+        ctx.fillRect(obstacle.x + 10, obstacle.y + 10, 30, 5);
+
+        ctx.fillStyle = "gray";
+    });
+}
+
+function updateObstacles(){
+
+    obstacles.forEach(obstacle => {
+        obstacle.x -= 9;
+
+        if(checkCollision(player, obstacle)){
+            endGame();
+        }
+    });
+
+    obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
+}
+
+function createAgent(){
+
+    const agent = {
+        x: canvas.width + 300,
+        y: 380,
+        width: 60,
+        height: 90
+    };
+
+    agents.push(agent);
+}
+
+function drawAgents(){
+
+    agents.forEach(agent => {
+
+        ctx.fillStyle = "navy";
+        ctx.fillRect(agent.x, agent.y, agent.width, agent.height);
+
+        // Head
+        ctx.fillStyle = "#f1c27d";
+        ctx.beginPath();
+        ctx.arc(agent.x + 30, agent.y - 15, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        // FBI text
+        ctx.fillStyle = "yellow";
+        ctx.font = "16px Arial";
+        ctx.fillText("FBI", agent.x + 10, agent.y + 50);
+    });
+}
+
+function updateAgents(){
+
+    agents.forEach(agent => {
+        agent.x -= 11;
+
+        if(checkCollision(player, agent)){
+            endGame();
+        }
+    });
+
+    agents = agents.filter(agent => agent.x + agent.width > 0);
+}
+
+function checkCollision(a, b){
+
+    return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+    );
+}
+
+function drawBackground(){
+
+    // Senate stairs
+    ctx.fillStyle = "#777";
+
+    for(let i = 0; i < 8; i++){
+        ctx.fillRect(i * 140, 470 - (i % 2 * 8), 140, 80);
+    }
+
+    // Building
+    ctx.fillStyle = "#222";
+    ctx.fillRect(300, 80, 500, 250);
+
+    // Columns
+    ctx.fillStyle = "#999";
+
+    for(let i = 0; i < 6; i++){
+        ctx.fillRect(350 + i * 70, 130, 30, 200);
+    }
+
+    // Title
+    ctx.fillStyle = "white";
+    ctx.font = "40px Arial";
+    ctx.fillText("SENATE", 450, 120);
+}
+
+function updateScore(){
+    score++;
+    scoreText.innerText = score;
+}
+
+function endGame(){
+    gameRunning = false;
+    gameOverScreen.style.display = "block";
+}
+
+function restartGame(){
+
+    score = 0;
+    obstacles = [];
+    agents = [];
+
+    player.y = 390;
+    player.velocityY = 0;
+
+    gameRunning = true;
+    gameOverScreen.style.display = "none";
+
+    animate();
+}
+
+function animate(){
+
+    if(!gameRunning) return;
+
+    requestAnimationFrame(animate);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawBackground();
+
+    drawPlayer();
+    updatePlayer();
+
+    drawObstacles();
+    updateObstacles();
+
+    drawAgents();
+    updateAgents();
+
+    updateScore();
+}
+
+setInterval(() => {
+
+    if(gameRunning){
+        createObstacle();
+    }
+
+}, 1800);
+
+setInterval(() => {
+
+    if(gameRunning){
+        createAgent();
+    }
+
+}, 4500);
+
+window.addEventListener("keydown", (e) => {
+
+    if(e.code === "Space" || e.code === "ArrowUp"){
+        jump();
+    }
+});
+
+window.addEventListener("click", () => {
+    jump();
+});
+
+animate();
+
+</script>
+
+</body>
+</html>
+```
+
+## Controls
+
+* SPACE = Jump
+* UP ARROW = Jump
+* Mouse Click = Jump
+
+## You Can Customize
+
+You can replace the placeholder image with your own image:
+
+```html
+<img src="your-image.png">
+```
+
+You can also:
+
+* Add sounds
+* Add coins
+* Add difficulty levels
+* Add animated backgrounds
+* Add intro screen
+* Upload it to GitHub Pages
